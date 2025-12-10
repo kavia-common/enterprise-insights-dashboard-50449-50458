@@ -1,19 +1,126 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import './App.css';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  Navigate,
+} from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider, useAuth, ROLES } from './context/AuthContext';
+import Login from './pages/Login';
+
+// Keep dashboard section components (Card, KPICard, etc.) as in original file
+function Card({ title, subtitle, children, accent = false, tone }) {
+  /** Generic surface card with subtle shadow and rounded corners. */
+  return (
+    <section className={`card ${accent ? 'accent' : ''} ${tone ? `tone-${tone}` : ''}`}>
+      <header className="card-header">
+        <div className="card-titles">
+          <h2 className="card-title">{title}</h2>
+          {subtitle && <div className="card-subtitle">{subtitle}</div>}
+        </div>
+        <div className="card-actions">
+          <button className="icon-button" aria-label="Refresh">↻</button>
+          <button className="icon-button" aria-label="More">⋮</button>
+        </div>
+      </header>
+      <div className="card-body">
+        {children}
+      </div>
+    </section>
+  );
+}
+function KPICard({ title, value, delta, trend }) {
+  /** KPI card with colored delta badge. */
+  const up = trend === 'up';
+  return (
+    <div className="kpi">
+      <div className="kpi-title">{title}</div>
+      <div className="kpi-value">{value}</div>
+      <div className={`kpi-delta ${up ? 'up' : 'down'}`}>
+        {up ? '▲' : '▼'} {delta}
+      </div>
+    </div>
+  );
+}
+function ChartPlaceholder({ type }) {
+  /** Placeholder for charts; replace with real chart library integration later. */
+  return (
+    <div className="chart-placeholder" role="img" aria-label={`${type} chart placeholder`}>
+      <div className="chart-gradient" />
+      <div className="chart-grid">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="chart-bar" style={{ height: `${25 + ((i * 7) % 60)}%` }} />
+        ))}
+      </div>
+      <div className="chart-footer">
+        <span>{type === 'line' ? 'Jan - Dec' : 'Regions'}</span>
+        <span className="hint">Replace with real chart</span>
+      </div>
+    </div>
+  );
+}
+function ListPlaceholder({ items }) {
+  /** Simple list style for placeholder data. */
+  return (
+    <ul className="list">
+      {items.map((it, idx) => (
+        <li key={idx} className="list-row">
+          <span className="list-name">{it.name}</span>
+          <span className="list-value">{it.value}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+function AlertsPlaceholder() {
+  /** Example alert items. */
+  const alerts = [
+    { sev: 'high', msg: 'API latency increased in region us-west-2' },
+    { sev: 'medium', msg: 'Revenue tracking delay for EU market' },
+    { sev: 'low', msg: 'New data source pending verification' }
+  ];
+  return (
+    <div className="alerts">
+      {alerts.map((a, i) => (
+        <div key={i} className={`alert sev-${a.sev}`}>
+          <span className="badge">{a.sev.toUpperCase()}</span>
+          <span className="msg">{a.msg}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function ExperimentPlaceholder() {
+  /** Visible when REACT_APP_EXPERIMENTS_ENABLED is true. */
+  return (
+    <div className="experiment">
+      <div className="exp-row">
+        <div className="exp-name">Homepage CTA Variant</div>
+        <div className="exp-metric up">+3.1% CTR</div>
+      </div>
+      <div className="exp-row">
+        <div className="exp-name">Pricing Page Layout</div>
+        <div className="exp-metric down">-0.8% Bounce</div>
+      </div>
+      <div className="exp-note">Experiments are enabled. Manage in Settings → Labs.</div>
+    </div>
+  );
+}
 
 // PUBLIC_INTERFACE
-function App() {
+function DashboardShell() {
   /**
-   * This component renders the enterprise dashboard shell with:
-   * - Sidebar navigation
-   * - Top header with search and profile menu
-   * - Main content with widgets and chart placeholders
-   * - Feature-flag aware sections
-   * It follows the Ocean Professional theme implemented in App.css and index.css.
+   * DashboardShell composes the layout, header, sidebar, and main content, and
+   * reads auth state to show role-aware navigation and user info.
    */
   const [theme, setTheme] = useState('light');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const { user, logout } = useAuth();
 
   // Respect existing environment variables without introducing new ones
   const API_BASE = process.env.REACT_APP_API_BASE || '';
@@ -34,24 +141,19 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // PUBLIC_INTERFACE
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
+  const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
-  const navItems = [
-    { key: 'overview', label: 'Overview', icon: '📊' },
-    { key: 'analytics', label: 'Analytics', icon: '📈' },
-    { key: 'reports', label: 'Reports', icon: '📄' },
-    { key: 'alerts', label: 'Alerts', icon: '🔔', flag: 'alerts' },
-    { key: 'exp-labs', label: 'Experiments', icon: '🧪', experiment: true },
+  const role = user?.role;
+
+  // Role-gated nav items
+  const nav = [
+    { to: '/', label: 'Dashboard', icon: '📊', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+    { to: '/admin', label: 'Admin Panel', icon: '🛠️', roles: [ROLES.ADMIN] },
+    { to: '/management', label: 'Management', icon: '📈', roles: [ROLES.ADMIN, ROLES.MANAGER] },
+    { to: '/employee', label: 'My Tasks', icon: '📝', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
   ];
 
-  const visibleNavItems = navItems.filter(item => {
-    if (item.experiment) return EXPERIMENTS_ENABLED;
-    if (item.flag) return !!flags[item.flag];
-    return true;
-  });
+  const visibleNav = nav.filter(n => !n.roles || n.roles.includes(role));
 
   return (
     <div className="ocean-app">
@@ -71,11 +173,11 @@ function App() {
           </button>
         </div>
         <nav className="nav">
-          {visibleNavItems.map(item => (
-            <button key={item.key} className="nav-item" aria-label={item.label}>
+          {visibleNav.map(item => (
+            <Link key={item.to} to={item.to} className="nav-item" aria-label={item.label}>
               <span className="nav-icon">{item.icon}</span>
               {sidebarOpen && <span className="nav-label">{item.label}</span>}
-            </button>
+            </Link>
           ))}
         </nav>
         <div className="sidebar-footer">
@@ -112,8 +214,8 @@ function App() {
                 aria-expanded={profileOpen ? 'true' : 'false'}
                 aria-label="User menu"
               >
-                <span className="avatar">A</span>
-                <span className="username">Admin</span>
+                <span className="avatar">{user?.name?.[0]?.toUpperCase() || 'U'}</span>
+                <span className="username">{user?.name || 'User'}</span>
                 <span className="chev">{profileOpen ? '▲' : '▼'}</span>
               </button>
               {profileOpen && (
@@ -122,7 +224,7 @@ function App() {
                   <button className="menu-item" role="menuitem">Settings</button>
                   <button className="menu-item" role="menuitem">Help</button>
                   <div className="menu-sep" />
-                  <button className="menu-item danger" role="menuitem">Sign out</button>
+                  <button className="menu-item danger" role="menuitem" onClick={logout}>Sign out</button>
                 </div>
               )}
             </div>
@@ -175,114 +277,98 @@ function App() {
   );
 }
 
-// Components (kept in the same file for simplicity; could be moved to /components)
-
 // PUBLIC_INTERFACE
-function Card({ title, subtitle, children, accent = false, tone }) {
-  /** Generic surface card with subtle shadow and rounded corners. */
+function AdminPage() {
   return (
-    <section className={`card ${accent ? 'accent' : ''} ${tone ? `tone-${tone}` : ''}`}>
-      <header className="card-header">
-        <div className="card-titles">
-          <h2 className="card-title">{title}</h2>
-          {subtitle && <div className="card-subtitle">{subtitle}</div>}
-        </div>
-        <div className="card-actions">
-          <button className="icon-button" aria-label="Refresh">↻</button>
-          <button className="icon-button" aria-label="More">⋮</button>
-        </div>
-      </header>
-      <div className="card-body">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-// PUBLIC_INTERFACE
-function KPICard({ title, value, delta, trend }) {
-  /** KPI card with colored delta badge. */
-  const up = trend === 'up';
-  return (
-    <div className="kpi">
-      <div className="kpi-title">{title}</div>
-      <div className="kpi-value">{value}</div>
-      <div className={`kpi-delta ${up ? 'up' : 'down'}`}>
-        {up ? '▲' : '▼'} {delta}
-      </div>
+    <div className="card">
+      <div className="card-header"><div className="card-titles"><h2 className="card-title">Admin Panel</h2><div className="card-subtitle">Restricted to administrators</div></div></div>
+      <div className="card-body">System settings, user management, and advanced configurations.</div>
     </div>
   );
 }
 
 // PUBLIC_INTERFACE
-function ChartPlaceholder({ type }) {
-  /** Placeholder for charts; replace with real chart library integration later. */
+function ManagementPage() {
   return (
-    <div className="chart-placeholder" role="img" aria-label={`${type} chart placeholder`}>
-      <div className="chart-gradient" />
-      <div className="chart-grid">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="chart-bar" style={{ height: `${25 + ((i * 7) % 60)}%` }} />
-        ))}
-      </div>
-      <div className="chart-footer">
-        <span>{type === 'line' ? 'Jan - Dec' : 'Regions'}</span>
-        <span className="hint">Replace with real chart</span>
-      </div>
+    <div className="card">
+      <div className="card-header"><div className="card-titles"><h2 className="card-title">Management</h2><div className="card-subtitle">For admins and managers</div></div></div>
+      <div className="card-body">Team performance, goals, and planning tools.</div>
     </div>
   );
 }
 
 // PUBLIC_INTERFACE
-function ListPlaceholder({ items }) {
-  /** Simple list style for placeholder data. */
+function EmployeePage() {
   return (
-    <ul className="list">
-      {items.map((it, idx) => (
-        <li key={idx} className="list-row">
-          <span className="list-name">{it.name}</span>
-          <span className="list-value">{it.value}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// PUBLIC_INTERFACE
-function AlertsPlaceholder() {
-  /** Example alert items. */
-  const alerts = [
-    { sev: 'high', msg: 'API latency increased in region us-west-2' },
-    { sev: 'medium', msg: 'Revenue tracking delay for EU market' },
-    { sev: 'low', msg: 'New data source pending verification' }
-  ];
-  return (
-    <div className="alerts">
-      {alerts.map((a, i) => (
-        <div key={i} className={`alert sev-${a.sev}`}>
-          <span className="badge">{a.sev.toUpperCase()}</span>
-          <span className="msg">{a.msg}</span>
-        </div>
-      ))}
+    <div className="card">
+      <div className="card-header"><div className="card-titles"><h2 className="card-title">My Tasks</h2><div className="card-subtitle">For all authenticated roles</div></div></div>
+      <div className="card-body">Your assigned tasks, deadlines, and progress.</div>
     </div>
   );
 }
 
 // PUBLIC_INTERFACE
-function ExperimentPlaceholder() {
-  /** Visible when REACT_APP_EXPERIMENTS_ENABLED is true. */
+function AppRoutes() {
+  /**
+   * Defines application routes, using ProtectedRoute to enforce auth and roles.
+   */
   return (
-    <div className="experiment">
-      <div className="exp-row">
-        <div className="exp-name">Homepage CTA Variant</div>
-        <div className="exp-metric up">+3.1% CTR</div>
-      </div>
-      <div className="exp-row">
-        <div className="exp-name">Pricing Page Layout</div>
-        <div className="exp-metric down">-0.8% Bounce</div>
-      </div>
-      <div className="exp-note">Experiments are enabled. Manage in Settings → Labs.</div>
-    </div>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <div className="ocean-app" style={{ gridTemplateColumns: '280px 1fr', gridTemplateAreas: '"sidebar header" "sidebar main"' }}>
+              <DashboardShell />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/management"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
+            <div className="ocean-app" style={{ gridTemplateColumns: '280px 1fr', gridTemplateAreas: '"sidebar header" "sidebar main"' }}>
+              <DashboardShell />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/employee"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <div className="ocean-app" style={{ gridTemplateColumns: '280px 1fr', gridTemplateAreas: '"sidebar header" "sidebar main"' }}>
+              <DashboardShell />
+            </div>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+// PUBLIC_INTERFACE
+function App() {
+  /**
+   * App wraps routes with AuthProvider and BrowserRouter.
+   */
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

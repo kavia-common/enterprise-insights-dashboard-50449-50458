@@ -19,6 +19,8 @@ import Announcements from './pages/Announcements';
 import { useLocation } from 'react-router-dom';
 import Inventory from './pages/Inventory';
 import { fetchInventoryNotifications } from './services/inventoryService';
+import Customers from './pages/Customers';
+import CustomerDetail from './pages/CustomerDetail';
 
 // Keep dashboard section components (Card, KPICard, etc.)
 function Card({ title, subtitle, children, accent = false, tone }) {
@@ -282,6 +284,7 @@ function DashboardShell() {
   const nav = [
     { to: '/', label: 'Dashboard', icon: '📊', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     ...(flags.inventory ? [{ to: '/inventory', label: 'Inventory', icon: '📦', roles: [ROLES.ADMIN, ROLES.MANAGER] }] : []),
+    ...(flags.customers ? [{ to: '/customers', label: 'Customers', icon: '🤝', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] }] : []),
     { to: '/employees', label: 'Employees', icon: '👥', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     { to: '/attendance', label: 'Attendance', icon: '📅', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     { to: '/leaves', label: 'Leaves', icon: '🏖️', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
@@ -342,6 +345,9 @@ function DashboardShell() {
               <input className="search-input" placeholder="Search insights, reports, KPIs..." aria-label="Search" />
             </div>
 
+            {flags.customers && (
+              <Link className="btn primary ghost" to="/customers" aria-label="Go to Customers">🤝 Customers</Link>
+            )}
             {flags.inventory && (
               <div style={{ position: 'relative' }}>
                 <button className="btn primary ghost" onClick={() => setInvNotifOpen(o => !o)} aria-label="Inventory notifications">
@@ -459,6 +465,12 @@ export function RouterAwareContent() {
   if (pathname === '/inventory') {
     return <Inventory />;
   }
+  if (pathname.startsWith('/customers/')) {
+    return <CustomerDetail />;
+  }
+  if (pathname === '/customers') {
+    return <Customers />;
+  }
   return <DashboardOverview />;
 }
 
@@ -522,6 +534,22 @@ function AppRoutes() {
         path="/inventory"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customers"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customers/:id"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
             <DashboardShell />
           </ProtectedRoute>
         }

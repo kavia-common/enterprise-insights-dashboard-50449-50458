@@ -9,6 +9,10 @@ This project provides a minimal React template with a clean, modern UI and minim
 - **Fast**: Minimal dependencies for quick loading times
 - **Simple**: Easy to understand and modify
 - **Inventory Monitoring (feature-flagged)**: Enable with `REACT_APP_FEATURE_FLAGS=inventory=true` to access the Inventory page (`/inventory`) including stock table, low-stock filter, and reorder notifications.
+- **Customer Management (feature-flagged)**: Enable with `REACT_APP_FEATURE_FLAGS=customers=true` to access:
+  - Customers list (`/customers`): searchable/sortable table with status badges and filters.
+  - Customer details (`/customers/:id`): profile card, recent calls/messages timeline, and support ticket status with badges and filters.
+  - A quick link button appears in the header when enabled.
 
 ## Getting Started
 

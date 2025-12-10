@@ -10,8 +10,9 @@ import {
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth, ROLES } from './context/AuthContext';
 import Login from './pages/Login';
+import { fetchMetrics } from './services/metricsService';
 
-// Keep dashboard section components (Card, KPICard, etc.) as in original file
+// Keep dashboard section components (Card, KPICard, etc.)
 function Card({ title, subtitle, children, accent = false, tone }) {
   /** Generic surface card with subtle shadow and rounded corners. */
   return (
@@ -45,18 +46,26 @@ function KPICard({ title, value, delta, trend }) {
     </div>
   );
 }
-function ChartPlaceholder({ type }) {
-  /** Placeholder for charts; replace with real chart library integration later. */
+function BarsFromSeries({ series }) {
+  // Renders simple bars based on y values; purely presentational
+  const maxY = Math.max(1, ...series.map(p => p.y || 0));
+  return (
+    <div className="chart-grid">
+      {series.map((p, i) => {
+        const h = Math.round((p.y / maxY) * 100);
+        return <div key={i} className="chart-bar" style={{ height: `${h}%` }} />;
+      })}
+    </div>
+  );
+}
+function ChartPlaceholder({ type = 'line', series = [] }) {
+  /** Placeholder for charts using series data; replace with real chart library later. */
   return (
     <div className="chart-placeholder" role="img" aria-label={`${type} chart placeholder`}>
       <div className="chart-gradient" />
-      <div className="chart-grid">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="chart-bar" style={{ height: `${25 + ((i * 7) % 60)}%` }} />
-        ))}
-      </div>
+      <BarsFromSeries series={series.length ? series : Array.from({ length: 8 }).map((_, i) => ({ x: i, y: 20 + ((i * 7) % 60) }))} />
       <div className="chart-footer">
-        <span>{type === 'line' ? 'Jan - Dec' : 'Regions'}</span>
+        <span>{type === 'line' ? 'Trend' : 'Segments'}</span>
         <span className="hint">Replace with real chart</span>
       </div>
     </div>
@@ -75,18 +84,13 @@ function ListPlaceholder({ items }) {
     </ul>
   );
 }
-function AlertsPlaceholder() {
-  /** Example alert items. */
-  const alerts = [
-    { sev: 'high', msg: 'API latency increased in region us-west-2' },
-    { sev: 'medium', msg: 'Revenue tracking delay for EU market' },
-    { sev: 'low', msg: 'New data source pending verification' }
-  ];
+function AlertsList({ alerts }) {
+  /** Notification alert component. */
   return (
     <div className="alerts">
       {alerts.map((a, i) => (
         <div key={i} className={`alert sev-${a.sev}`}>
-          <span className="badge">{a.sev.toUpperCase()}</span>
+          <span className="badge">{(a.sev || 'info').toUpperCase()}</span>
           <span className="msg">{a.msg}</span>
         </div>
       ))}
@@ -107,6 +111,108 @@ function ExperimentPlaceholder() {
       </div>
       <div className="exp-note">Experiments are enabled. Manage in Settings → Labs.</div>
     </div>
+  );
+}
+
+// PUBLIC_INTERFACE
+function DashboardOverview() {
+  /**
+   * Dashboard overview: Sales chart with period switch, KPI cards,
+   * employee activity, notifications, and recent feed.
+   * Uses mock data with optional backend fetch via metricsService.
+   */
+  const [period, setPeriod] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
+  const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState({
+    kpis: [],
+    sales: [],
+    activity: [],
+    notifications: [],
+    recent: [],
+  });
+
+  const load = async (p) => {
+    setLoading(true);
+    try {
+      const data = await fetchMetrics(p);
+      setMetrics(data);
+    } catch (_e) {
+      // metricsService already falls back; no-op
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load(period);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
+
+  const onSwitch = (p) => setPeriod(p);
+
+  return (
+    <section className="dashboard">
+      <div className="kpi-grid" aria-label="KPI cards">
+        {metrics.kpis.map((k, i) => (
+          <KPICard key={i} title={k.title} value={k.value} delta={k.delta} trend={k.trend} />
+        ))}
+      </div>
+
+      <div className="content-grid">
+        <section className="card accent">
+          <header className="card-header">
+            <div className="card-titles">
+              <h2 className="card-title">Sales Overview</h2>
+              <div className="card-subtitle">
+                {period === 'daily' ? 'Today' : period === 'weekly' ? 'This Week' : 'This Year'}
+              </div>
+            </div>
+            <div className="card-actions" role="tablist" aria-label="Sales period">
+              <button
+                className="btn primary ghost"
+                aria-selected={period === 'daily'}
+                onClick={() => onSwitch('daily')}
+              >
+                Daily
+              </button>
+              <button
+                className="btn primary ghost"
+                aria-selected={period === 'weekly'}
+                onClick={() => onSwitch('weekly')}
+              >
+                Weekly
+              </button>
+              <button
+                className="btn primary ghost"
+                aria-selected={period === 'monthly'}
+                onClick={() => onSwitch('monthly')}
+              >
+                Monthly
+              </button>
+            </div>
+          </header>
+          <div className="card-body">
+            {loading ? (
+              <div className="exp-note">Loading {period} metrics…</div>
+            ) : (
+              <ChartPlaceholder type="line" series={metrics.sales} />
+            )}
+          </div>
+        </section>
+
+        <Card title="Employee Activity" subtitle="Status breakdown">
+          <ListPlaceholder items={metrics.activity} />
+        </Card>
+
+        <Card title="Notifications" subtitle="Operational and business alerts" tone="warning">
+          <AlertsList alerts={metrics.notifications} />
+        </Card>
+
+        <Card title="Recent Tasks & Events" subtitle="Latest updates">
+          <ListPlaceholder items={metrics.recent} />
+        </Card>
+      </div>
+    </section>
   );
 }
 
@@ -231,47 +337,7 @@ function DashboardShell() {
           </div>
         </header>
 
-        <section className="dashboard">
-          <div className="kpi-grid">
-            <KPICard title="Revenue" value="$1.24M" delta="+4.2%" trend="up" />
-            <KPICard title="Active Users" value="58,421" delta="+2.1%" trend="up" />
-            <KPICard title="Churn" value="2.3%" delta="-0.3%" trend="down" />
-            <KPICard title="NPS" value="47" delta="+1" trend="up" />
-          </div>
-
-          <div className="content-grid">
-            <Card title="Sales Overview" subtitle="Last 12 months" accent>
-              <ChartPlaceholder type="line" />
-            </Card>
-
-            <Card title="Top Products" subtitle="By revenue">
-              <ListPlaceholder
-                items={[
-                  { name: 'Product Alpha', value: '$420k' },
-                  { name: 'Product Beta', value: '$315k' },
-                  { name: 'Service Gamma', value: '$210k' },
-                  { name: 'Addon Delta', value: '$145k' }
-                ]}
-              />
-            </Card>
-
-            <Card title="Geographic Distribution" subtitle="Active users by region">
-              <ChartPlaceholder type="map" />
-            </Card>
-
-            {flags['alerts'] && (
-              <Card title="Alerts" subtitle="Operational and business alerts" tone="warning">
-                <AlertsPlaceholder />
-              </Card>
-            )}
-
-            {EXPERIMENTS_ENABLED && (
-              <Card title="Experiments Lab" subtitle="Feature experiments and A/B results" tone="info">
-                <ExperimentPlaceholder />
-              </Card>
-            )}
-          </div>
-        </section>
+        <DashboardOverview />
       </main>
     </div>
   );

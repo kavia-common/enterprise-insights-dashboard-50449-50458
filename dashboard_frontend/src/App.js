@@ -17,6 +17,8 @@ import Attendance from './pages/Attendance';
 import Leaves from './pages/Leaves';
 import Announcements from './pages/Announcements';
 import { useLocation } from 'react-router-dom';
+import Inventory from './pages/Inventory';
+import { fetchInventoryNotifications } from './services/inventoryService';
 
 // Keep dashboard section components (Card, KPICard, etc.)
 function Card({ title, subtitle, children, accent = false, tone }) {
@@ -231,6 +233,8 @@ function DashboardShell() {
   const [theme, setTheme] = useState('light');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [invNotifOpen, setInvNotifOpen] = useState(false);
+  const [invNotifs, setInvNotifs] = useState([]);
 
   const { user, logout } = useAuth();
 
@@ -246,8 +250,25 @@ function DashboardShell() {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean)
-      .reduce((acc, k) => { acc[k] = true; return acc; }, {});
+      .reduce((acc, entry) => {
+        const [k, v] = entry.split('=').map(x => x?.trim());
+        if (!k) return acc;
+        acc[k] = typeof v === 'undefined' ? true : String(v).toLowerCase() !== 'false';
+        return acc;
+      }, {});
   }, [FEATURE_FLAGS]);
+
+  useEffect(() => {
+    // Preload inventory notifications for header bell
+    (async () => {
+      try {
+        const list = await fetchInventoryNotifications();
+        setInvNotifs(Array.isArray(list) ? list : []);
+      } catch {
+        setInvNotifs([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -260,6 +281,7 @@ function DashboardShell() {
   // Role-gated nav items
   const nav = [
     { to: '/', label: 'Dashboard', icon: '📊', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+    ...(flags.inventory ? [{ to: '/inventory', label: 'Inventory', icon: '📦', roles: [ROLES.ADMIN, ROLES.MANAGER] }] : []),
     { to: '/employees', label: 'Employees', icon: '👥', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     { to: '/attendance', label: 'Attendance', icon: '📅', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     { to: '/leaves', label: 'Leaves', icon: '🏖️', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
@@ -319,6 +341,33 @@ function DashboardShell() {
               <span className="search-icon">🔎</span>
               <input className="search-input" placeholder="Search insights, reports, KPIs..." aria-label="Search" />
             </div>
+
+            {flags.inventory && (
+              <div style={{ position: 'relative' }}>
+                <button className="btn primary ghost" onClick={() => setInvNotifOpen(o => !o)} aria-label="Inventory notifications">
+                  🔔 {invNotifs.length > 0 ? `(${invNotifs.length})` : ''}
+                </button>
+                {invNotifOpen && (
+                  <div className="profile-menu" role="dialog" aria-label="Header inventory notifications" style={{ right: 0, left: 'auto', minWidth: 320 }}>
+                    <div style={{ padding: '6px 8px', fontWeight: 700 }}>Inventory Notifications</div>
+                    <div className="menu-sep" />
+                    <div style={{ display: 'grid', gap: 6, padding: 6, maxHeight: 300, overflowY: 'auto' }}>
+                      {invNotifs.map(n => (
+                        <div key={n.id} className="list-row">
+                          <div>
+                            <div className="list-name">{n.product} <span className="exp-note">({n.sku})</span></div>
+                            <div className="exp-note">{n.message}</div>
+                          </div>
+                          <div className="exp-note">{n.status}</div>
+                        </div>
+                      ))}
+                      {invNotifs.length === 0 && <div className="exp-note" style={{ padding: 8 }}>No inventory notifications.</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button className="btn primary ghost" onClick={toggleTheme} aria-label="Toggle theme">
               {theme === 'light' ? '🌙' : '☀️'} Theme
             </button>
@@ -407,6 +456,9 @@ export function RouterAwareContent() {
   if (pathname === '/announcements') {
     return <Announcements />;
   }
+  if (pathname === '/inventory') {
+    return <Inventory />;
+  }
   return <DashboardOverview />;
 }
 
@@ -462,6 +514,14 @@ function AppRoutes() {
         path="/announcements"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/inventory"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
             <DashboardShell />
           </ProtectedRoute>
         }

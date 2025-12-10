@@ -8,6 +8,7 @@ This project provides a minimal React template with a clean, modern UI and minim
 - **Modern UI**: Clean, responsive design with KAVIA brand styling
 - **Fast**: Minimal dependencies for quick loading times
 - **Simple**: Easy to understand and modify
+- **Inventory Monitoring (feature-flagged)**: Enable with `REACT_APP_FEATURE_FLAGS=inventory=true` to access the Inventory page (`/inventory`) including stock table, low-stock filter, and reorder notifications.
 
 ## Getting Started
 

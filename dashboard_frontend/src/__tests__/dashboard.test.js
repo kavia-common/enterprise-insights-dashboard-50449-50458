@@ -27,6 +27,9 @@ test('dashboard overview renders for manager role with sales period controls', a
   // Expect KPI grid and Sales Overview title
   expect(await screen.findByText(/Enterprise Dashboard/i)).toBeInTheDocument();
   expect(await screen.findByText(/Sales Overview/i)).toBeInTheDocument();
+  // Ensure sidebar shows Employees for admin role
+  // Sidebar may render link with aria-label set on Link; wait for it to appear
+  expect(await screen.findByLabelText('Employees')).toBeInTheDocument();
 
   // Period buttons
   const dailyBtn = screen.getByRole('button', { name: /Daily/i });

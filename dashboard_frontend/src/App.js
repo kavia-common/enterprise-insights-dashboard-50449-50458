@@ -11,6 +11,12 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth, ROLES } from './context/AuthContext';
 import Login from './pages/Login';
 import { fetchMetrics } from './services/metricsService';
+import Employees from './pages/Employees';
+import EmployeeDetail from './pages/EmployeeDetail';
+import Attendance from './pages/Attendance';
+import Leaves from './pages/Leaves';
+import Announcements from './pages/Announcements';
+import { useLocation } from 'react-router-dom';
 
 // Keep dashboard section components (Card, KPICard, etc.)
 function Card({ title, subtitle, children, accent = false, tone }) {
@@ -254,6 +260,10 @@ function DashboardShell() {
   // Role-gated nav items
   const nav = [
     { to: '/', label: 'Dashboard', icon: '📊', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+    { to: '/employees', label: 'Employees', icon: '👥', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+    { to: '/attendance', label: 'Attendance', icon: '📅', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+    { to: '/leaves', label: 'Leaves', icon: '🏖️', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+    { to: '/announcements', label: 'Announcements', icon: '📣', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     { to: '/admin', label: 'Admin Panel', icon: '🛠️', roles: [ROLES.ADMIN] },
     { to: '/management', label: 'Management', icon: '📈', roles: [ROLES.ADMIN, ROLES.MANAGER] },
     { to: '/employee', label: 'My Tasks', icon: '📝', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
@@ -337,7 +347,7 @@ function DashboardShell() {
           </div>
         </header>
 
-        <DashboardOverview />
+        <RouterAwareContent />
       </main>
     </div>
   );
@@ -374,6 +384,33 @@ function EmployeePage() {
 }
 
 // PUBLIC_INTERFACE
+export function RouterAwareContent() {
+  /**
+   * Renders the appropriate page inside the DashboardShell depending on the current route.
+   * Keeps a single shell with sidebar/header consistent across sections.
+   */
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  if (pathname.startsWith('/employees/')) {
+    return <EmployeeDetail />;
+  }
+  if (pathname === '/employees') {
+    return <Employees />;
+  }
+  if (pathname === '/attendance') {
+    return <Attendance />;
+  }
+  if (pathname === '/leaves') {
+    return <Leaves />;
+  }
+  if (pathname === '/announcements') {
+    return <Announcements />;
+  }
+  return <DashboardOverview />;
+}
+
+// PUBLIC_INTERFACE
 function AppRoutes() {
   /**
    * Defines application routes, using ProtectedRoute to enforce auth and roles.
@@ -385,6 +422,46 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/employees"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/employees/:id"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/attendance"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leaves"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
+            <DashboardShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/announcements"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}>
             <DashboardShell />
           </ProtectedRoute>
         }
